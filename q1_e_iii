@@ -1,0 +1,103 @@
+clear('all');
+format('short');
+
+% Time step (non-dim.)
+tau = 0.01;
+
+% Dimensionalisation parameters
+Ls = 1.0; % Choice for scaling length(non-dim)
+G = 9.8; % default value of gravity (m/s^2)
+Ts = sqrt(Ls/G); % Choice for scale for time(non-dim)
+
+% Initial values
+pos = [0 20]; %Initial position (non-dim.)
+speed_ms = 300; %Initial velocity (m/s)
+speed = speed_ms/(Ls/Ts); % Non-dimensionalise initial speed
+angle = 0; %In degrees
+angle = angle*pi/180; %In radians
+vel = speed*[cos(angle) sin(angle)]; %Initial velocity (non-dim.)
+v_y = [vel(2)];
+vel_initial = norm(vel);
+
+% Total integration time (non-dim)
+T = 4*pi; 
+
+% Number of integration steps
+numSteps = ceil(T/tau);
+
+% Store values:
+x = [];
+y = [];
+
+% Initial acceleration (non-dim)
+rho = 1.2; %in kg/m^3
+Cd = 0.10; %drag coefficient
+A = pi*(4.5*10^-2)^2; %cross-sentional area in m^2
+m = 3; %in kg
+D = (0.5*rho*Cd*A*Ls)/m; %drag force
+accel = [0 0]; %no acceleration when t = 0 s
+acceleration_y = [accel(2)];
+
+%-------------------------------------------------------------------------------
+% Verlet method integration
+%-------------------------------------------------------------------------------
+n = 0;
+while pos(2) >= 0
+    n = n + 1;
+
+    % Store position for plotting:
+    x(n) = pos(1);
+    y(n) = pos(2);
+    
+    % Take one step of the Verlet Method to update position and speed
+    vel_next = vel + accel*tau;
+    pos_next = pos + 0.5*tau*(vel_next+vel);
+    
+    % Update acceleration after taking the step:
+    accel_x = -D * vel_next(1).^2;
+    accel_y = -D * vel_next(2).^2 - 1;
+    accel = [accel_x accel_y];
+    
+    % Store update value:
+    v_y = [v_y vel_next(2)];
+    acceleration_y = [acceleration_y accel_y];
+    
+    % Update parameters:
+    vel = vel_next;
+    pos = pos_next;
+end
+
+%-------------------------------------------------------------------------------
+% Plot the trajectory (as dimensional values):
+f = figure('color','w');
+plot(Ls*x,Ls*y,'o-k')
+xlabel('Distance (m)')
+ylabel('Height (m)')
+title('A projectile motion with an air drag force with initial height being 20 m')
+
+% Linear interpolation to estimate the range of the projectile
+range = pos(1) - pos(2)*(pos(1)-x(end))/(pos(2)-y(end));
+range_m = Ls*range; % convert back to m
+fprintf('Range (m): %f\n',range_m)
+
+% Analytic expression for range (no air resistance)
+%estimated range is a bit less than half of the no-air-resistance case
+an_range_m = speed_ms^2*sin(2*angle)/(2*G);
+fprintf('Half of an analytic value for range with no air resistance (m): %f.\n',an_range_m)
+
+%time of flight
+for i = 2: length(v_y)
+    if v_y(i)<0
+        accel_half = acceleration_y(i-1); %acceleration at half flight with positive v_y at the maximum
+        break
+    end
+end
+u_y = 10*sind(60); %initial speed in y-direction in m/s
+accel_half = accel_half*(Ls/Ts^2); %in m/s^2
+time_full = -2*u_y/accel_half; %from v_y = u_y + a_y*t = 0
+fprintf('Time of flight (s): %f.\n',time_full)
+
+%error  of time of flight
+an_time_full = (norm(vel_next)/(2*G))/tan(norm(vel_initial)/norm(vel_next));
+error = abs(an_time_full-time_full(end))*100 /an_time_full;
+fprintf('%error (m): %f.\n',error)
