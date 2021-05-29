@@ -1,0 +1,79 @@
+clear('all');
+format('short');
+
+%-------------------------------------------------------------------------------
+% Time grid parameters:
+tau = 0.05; % Time step
+T = 8; % Total integration time
+numSteps = ceil(T/tau); % Number of time steps
+frameUpdateLag = 0; % Slow down the animation
+
+%-------------------------------------------------------------------------------
+% Initial conditions
+theta1 = 0; % Initial angle in degrees
+theta = theta1*pi/180;
+%omega = 8*pi; %for omega = 4(g/L)^(1/2)
+omega = 20*pi; %for omega = 10(g/L)^(1/2)
+x = [theta omega];
+
+%-------------------------------------------------------------------------------
+% Rainbow Mode
+rainbowMode = true;
+rainbow = jet(64);
+
+%-------------------------------------------------------------------------------
+% Preallocate:
+time = (0:numSteps)*tau;
+
+%-------------------------------------------------------------------------------
+% Set up for efficient animation
+figure('color','w');
+h = plot([0,sin(x(1))],[0,-cos(x(1))],'o-k','LineWidth',2);
+axis('equal')
+axis([-1 1 -1 1])
+% Prevent axes limits from changing:
+h.YLimInclude = 'off';
+h.XLimInclude = 'off';
+
+%-------------------------------------------------------------------------------
+% Fourth-order Runge-Kutta integration
+omega_plot = [omega];
+
+for n = 1:numSteps
+
+    % One step of RK4
+    f1 = rhs_pend(x);
+    f2 = rhs_pend(x + 0.5*tau*f1);
+    f3 = rhs_pend(x + 0.5*tau*f2);
+    f4 = rhs_pend(x + tau*f3);
+    x = x + tau*(f1 + 2*f2+2*f3 + f4)/6; %x = [theta omega]
+    omega_plot = [omega_plot x(2)];
+
+    % Update the pendulum position:
+    % Co-ordinates of the pendulum bar
+    xPend = [0  sin(x(1))];
+    yPend = [0 -cos(x(1))];
+
+    % plot(xPend,yPend,'o-') or use the following codes to plot:
+    h.XData = xPend;
+    h.YData = yPend;
+    if rainbowMode
+        h.Color = rainbow(rem(n,64) + 1,:);
+    end
+
+    % Update time and keep axes fixed:
+    title(sprintf('Time: %5.3f',time(n) + tau))
+    pause(frameUpdateLag);
+    drawnow()
+end
+
+%plot time versus omega to look for when omega > 2pi(L/g)^(1/2) = 4pi (non-dim. omega)
+figure(2)
+plot(time,omega_plot)
+hold on
+limit = 4*pi*ones(1,length(time));
+plot(time,limit,'r')
+title("Non-dimentional time versus non-dimentional angular frequency of a damping pendulum")
+xlabel('Time')
+ylabel('$\omega$','Interpreter','latex')
+legend({'$\omega$ of the pendulum','When an initial angular frequency, $\omega_0 = 20\pi$'},'Interpreter','latex')
